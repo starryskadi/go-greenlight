@@ -1,0 +1,7 @@
+{
+  "launch.defaultConfig": {
+    "name": "Launch GO",
+    "type": "go",
+    "request": "launch"
+  }
+}
