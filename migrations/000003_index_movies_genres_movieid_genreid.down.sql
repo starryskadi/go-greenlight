@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS movies_genres_movie_id_genre_id_idx;

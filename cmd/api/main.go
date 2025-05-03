@@ -27,6 +27,7 @@ type config struct {
 }
 
 type application struct {
+	database *sql.DB
 	config config 
 	logger *log.Logger 
 	models data.Models
@@ -59,6 +60,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		database: db,
 	}
 
 	srv := http.Server{

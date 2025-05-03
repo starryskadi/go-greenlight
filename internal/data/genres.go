@@ -32,10 +32,12 @@ func (g GenreModel) Insert(genre *Genre) error {
 }
 
 func (g GenreModel) Update(genre Genre) error {
+	// Won't Implement
 	return nil
 }
 
 func (g GenreModel) Get(id int) (*Genre, error) {
+	// Won't Implement
 	return nil, nil
 }
 

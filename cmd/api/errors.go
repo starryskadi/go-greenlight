@@ -30,3 +30,7 @@ func (app *application) serverErrorResponse(w http.ResponseWriter, err error) {
 func (app *application) failedValidationResponse(w http.ResponseWriter, errors map[string]string) {
 	app.errorResponse(w, http.StatusUnprocessableEntity, errors)
 }
+
+func (app *application) notFoundResponse(w http.ResponseWriter) {
+	app.errorResponse(w, http.StatusNotFound, "the requested resource could not be found")
+}

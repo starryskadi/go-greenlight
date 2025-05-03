@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"kyawzayarwin.com/greenlight/internal/validator"
@@ -51,10 +52,77 @@ func (m MovieModel) Insert(movie *Movie) error {
 }
 
 func (m MovieModel) Get(id int) (*Movie, error) {
-	return nil, nil
+	stmt := `SELECT m.id, m.title, m.year, m.runtime, g.id as "genre_id" , g.title AS "genre_title" FROM public."movies" as m
+		LEFT JOIN movies_genres as mg ON m.id = mg.movie_id
+		JOIN genres as g ON mg.genre_id = g.id
+		WHERE m.id = $1;`
+
+	rows, err := m.DB.Query(stmt, id)  
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrRecordNotFound
+		}
+		return nil, err
+	} 
+
+	defer rows.Close()
+
+	movie := &Movie{}
+
+	genreMap := map[int]bool{}
+
+	found := false
+
+	for rows.Next() {
+		found = true
+		var (
+			ID int
+			title string 
+			year int32
+			runtime int 
+			genreId sql.NullInt32
+			genreTitle sql.NullString  
+		)
+
+
+		err = rows.Scan(&ID, &title, &year, &runtime, &genreId, &genreTitle)
+
+		if err != nil {
+			return nil, err
+		} 
+
+		if movie.ID == 0 {
+			movie.ID = ID 
+			movie.Title = title 
+			movie.Year = year 
+			movie.Runtime = Runtime(runtime)  
+		}
+
+		if genreId.Valid && genreTitle.Valid {
+			if _, exists := genreMap[int(genreId.Int32)]; !exists {
+				movie.Genres = append(movie.Genres, genreTitle.String)
+				genreMap[int(genreId.Int32)] = true 
+			}
+		}
+	}
+
+	if !found {
+		return nil, ErrRecordNotFound
+	}
+
+	return movie, nil
 }
 
 func (m MovieModel) Update(movie *Movie) error {
+	stmt := "UPDATE movies SET title = $2, year = $3, runtime = $4 WHERE id = $1";
+
+	_, err := m.DB.Exec(stmt, movie.ID, movie.Title, movie.Year, movie.Runtime);
+
+	if err != nil {
+		return err 
+	}
+
 	return nil
 }
 
