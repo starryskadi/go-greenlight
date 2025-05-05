@@ -1,10 +1,13 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/lib/pq"
 	"kyawzayarwin.com/greenlight/internal/validator"
 )
 
@@ -43,91 +46,157 @@ type MovieInterface interface {
 	Get(id int) (*Movie, error)
 	Update(movie *Movie) error 
 	Delete(id int) error
+	GetAll(title string, genres []string, filters Filters) ([]*Movie, error) 
 }
 
 func (m MovieModel) Insert(movie *Movie) error {
 	stmt := `INSERT INTO movies (title, year, runtime) VALUES($1, $2, $3) RETURNING id, created_at, version;`
 
-	return m.DB.QueryRow(stmt, movie.Title, movie.Year, movie.Runtime).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	defer cancel()
+
+	return m.DB.QueryRowContext(ctx, stmt, movie.Title, movie.Year, movie.Runtime).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int) (*Movie, error) {
-	stmt := `SELECT m.id, m.title, m.year, m.runtime, g.id as "genre_id" , g.title AS "genre_title" FROM public."movies" as m
-		LEFT JOIN movies_genres as mg ON m.id = mg.movie_id
-		JOIN genres as g ON mg.genre_id = g.id
-		WHERE m.id = $1;`
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
 
-	rows, err := m.DB.Query(stmt, id)  
+	stmt := `SELECT m.id, m.title, m.year, m.runtime, m.version, ARRAY_AGG(g.title) as "genre_title" FROM public."movies" as m
+		LEFT JOIN movies_genres as mg ON m.id = mg.movie_id
+		LEFT JOIN genres as g ON mg.genre_id = g.id
+		WHERE m.id = $1
+		GROUP BY m.id,  m.title, m.year, m.runtime, m.version;`
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	defer cancel()
+
+	row := m.DB.QueryRowContext(ctx, stmt, id)  
+
+	movie := &Movie{}
+
+	var genreTitles []sql.NullString
+	err := row.Scan(&movie.ID, &movie.Title, &movie.Year, &movie.Runtime, &movie.Version, pq.Array(&genreTitles))
+
+	genres := []string{}
+	for _, g := range genreTitles {
+		if g.Valid {
+			genres = append(genres, g.String)
+		}
+	}
+
+	movie.Genres = genres
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrRecordNotFound
 		}
 		return nil, err
-	} 
-
-	defer rows.Close()
-
-	movie := &Movie{}
-
-	genreMap := map[int]bool{}
-
-	found := false
-
-	for rows.Next() {
-		found = true
-		var (
-			ID int
-			title string 
-			year int32
-			runtime int 
-			genreId sql.NullInt32
-			genreTitle sql.NullString  
-		)
-
-
-		err = rows.Scan(&ID, &title, &year, &runtime, &genreId, &genreTitle)
-
-		if err != nil {
-			return nil, err
-		} 
-
-		if movie.ID == 0 {
-			movie.ID = ID 
-			movie.Title = title 
-			movie.Year = year 
-			movie.Runtime = Runtime(runtime)  
-		}
-
-		if genreId.Valid && genreTitle.Valid {
-			if _, exists := genreMap[int(genreId.Int32)]; !exists {
-				movie.Genres = append(movie.Genres, genreTitle.String)
-				genreMap[int(genreId.Int32)] = true 
-			}
-		}
-	}
-
-	if !found {
-		return nil, ErrRecordNotFound
 	}
 
 	return movie, nil
 }
 
 func (m MovieModel) Update(movie *Movie) error {
-	stmt := "UPDATE movies SET title = $2, year = $3, runtime = $4 WHERE id = $1";
+	stmt := "UPDATE movies SET title = $2, year = $3, runtime = $4, version = version + 1 WHERE id = $1 AND version = $5 RETURNING version";
 
-	_, err := m.DB.Exec(stmt, movie.ID, movie.Title, movie.Year, movie.Runtime);
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	defer cancel()
+
+	row := m.DB.QueryRowContext(ctx, stmt, movie.ID, movie.Title, movie.Year, movie.Runtime, movie.Version);
+
+	err := row.Scan(&movie.Version)
 
 	if err != nil {
-		return err 
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (m MovieModel) Delete(id int) error {
+	stmt := "DELETE FROM movies WHERE id = $1;";
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	defer cancel()
+
+	result, err := m.DB.ExecContext(ctx, stmt, id)
+	
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
 	return nil 
+}
+
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+	stmt := `SELECT m.id, m.title, m.year, m.runtime, m.version, ARRAY_AGG(g.title) as "genre_title" FROM public."movies" as m
+		LEFT JOIN movies_genres as mg ON m.id = mg.movie_id
+		LEFT JOIN genres as g ON mg.genre_id = g.id
+		WHERE (m.title ILIKE $1 OR $1 = '')
+		GROUP BY m.id,  m.title, m.year, m.runtime, m.version
+		HAVING ($2 <@ ARRAY_AGG(g.title) OR $2= '{}')
+		ORDER BY $5
+		LIMIT $3
+		OFFSET $4;`
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	defer cancel()
+
+	search := fmt.Sprintf("%s%%", title)
+	sortBy := "m.id ASC"
+
+	row, err := m.DB.QueryContext(ctx, stmt, search, pq.Array(genres), filters.PageSize, (filters.Page - 1) * filters.PageSize, sortBy)  
+
+	if err != nil {
+		return nil, err
+	}
+
+	movies := []*Movie{}
+
+	for row.Next() {
+		var movie Movie
+
+		var genreTitles []sql.NullString
+		err := row.Scan(&movie.ID, &movie.Title, &movie.Year, &movie.Runtime, &movie.Version, pq.Array(&genreTitles))
+
+		genres := []string{}
+		for _, g := range genreTitles {
+			if g.Valid {
+				genres = append(genres, g.String)
+			}
+		}
+
+		movie.Genres = genres
+
+		if err != nil {
+			return nil, err
+		}
+
+		movies = append(movies, &movie)
+	}
+
+	if err = row.Err(); err != nil {
+		return nil, err
+	}
+
+	return movies, nil 
 }
 
 type MockMovieModel struct{}
@@ -145,4 +214,8 @@ func (m MockMovieModel) Update(movie *Movie) error {
 
 func (m MockMovieModel) Delete(id int) error {
 	return nil 
+}
+
+func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+	return nil, nil
 }

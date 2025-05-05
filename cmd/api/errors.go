@@ -34,3 +34,12 @@ func (app *application) failedValidationResponse(w http.ResponseWriter, errors m
 func (app *application) notFoundResponse(w http.ResponseWriter) {
 	app.errorResponse(w, http.StatusNotFound, "the requested resource could not be found")
 }
+
+func (app *application) badRequestResponse(w http.ResponseWriter, err error) {
+	app.errorResponse(w, http.StatusBadRequest, err)
+}
+
+func (app *application) editConflictResponse(w http.ResponseWriter) {
+	message := "unable to update the record due to an edit conflict, please try again"
+	app.errorResponse(w, http.StatusConflict, message)
+}
