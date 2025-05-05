@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -149,7 +148,7 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	stmt := `SELECT m.id, m.title, m.year, m.runtime, m.version, ARRAY_AGG(g.title) as "genre_title" FROM public."movies" as m
 		LEFT JOIN movies_genres as mg ON m.id = mg.movie_id
 		LEFT JOIN genres as g ON mg.genre_id = g.id
-		WHERE (m.title ILIKE $1 OR $1 = '')
+		WHERE (to_tsvector('simple', m.title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
 		GROUP BY m.id,  m.title, m.year, m.runtime, m.version
 		HAVING ($2 <@ ARRAY_AGG(g.title) OR $2= '{}')
 		ORDER BY $5
@@ -159,10 +158,9 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
 	defer cancel()
 
-	search := fmt.Sprintf("%s%%", title)
 	sortBy := "m.id ASC"
 
-	row, err := m.DB.QueryContext(ctx, stmt, search, pq.Array(genres), filters.PageSize, (filters.Page - 1) * filters.PageSize, sortBy)  
+	row, err := m.DB.QueryContext(ctx, stmt, title, pq.Array(genres), filters.PageSize, (filters.Page - 1) * filters.PageSize, sortBy)  
 
 	if err != nil {
 		return nil, err
