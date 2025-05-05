@@ -1,10 +1,4 @@
-ALTER TABLE movies_genres DROP CONSTRAINT IF EXISTS fk_genre_id;
-ALTER TABLE movies_genres DROP CONSTRAINT IF EXISTS fk_movie_id;
-ALTER TABLE movies_genres DROP CONSTRAINT IF EXISTS pk_movies_genres;
-
 DROP TABLE IF EXISTS movies_genres;
-
-ALTER TABLE genres DROP CONSTRAINT IF EXISTS title_unique;
 
 DROP TABLE IF EXISTS genres;
 DROP TABLE IF EXISTS movies;
