@@ -20,25 +20,25 @@ import (
 const version = "1.0.0"
 
 type config struct {
-	port int;
-	env string;
-	db struct {
-		dsn string;
-		maxOpenConns int;
-		maxIdleConns int; 
-		maxIdleTime string;
+	port int
+	env  string
+	db   struct {
+		dsn          string
+		maxOpenConns int
+		maxIdleConns int
+		maxIdleTime  string
 	}
 	limiter struct {
-		rps float64
-		burst int
+		rps     float64
+		burst   int
 		enabled bool
 	}
 	smtp struct {
-		host string
-		port int 
-		username string 
-		password string 
-		sender string 
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
 	}
 	cors struct {
 		trustedOrigin []string
@@ -47,11 +47,11 @@ type config struct {
 
 type application struct {
 	database *sql.DB
-	config config 
-	logger *jsonlog.Logger 
-	models data.Models
-	mailer mailer.Mailer
-	wg sync.WaitGroup
+	config   config
+	logger   *jsonlog.Logger
+	models   data.Models
+	mailer   mailer.Mailer
+	wg       sync.WaitGroup
 }
 
 func main() {
@@ -61,7 +61,7 @@ func main() {
 
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
-	flag.StringVar(&cfg.db.dsn, "dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgreSQL's DSN") 
+	flag.StringVar(&cfg.db.dsn, "dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgreSQL's DSN")
 
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
@@ -76,7 +76,7 @@ func main() {
 		return nil
 	})
 
-	var smtpPort int 
+	var smtpPort int
 
 	if envSmtpPort := os.Getenv("SMTP_PORT"); envSmtpPort != "" {
 		if tempSmtpPort, err := strconv.Atoi(envSmtpPort); err == nil {
@@ -102,7 +102,6 @@ func main() {
 
 	logger.PrintInfo("database connection pool established", nil)
 
-
 	expvar.NewString("version").Set(version)
 
 	// Publish the number of active goroutines.
@@ -118,13 +117,12 @@ func main() {
 		return time.Now().Unix()
 	}))
 
-
 	app := application{
-		config: cfg,
-		logger: logger,
-		models: data.NewModels(db),
+		config:   cfg,
+		logger:   logger,
+		models:   data.NewModels(db),
 		database: db,
-		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
+		mailer:   mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 
 	err = app.serve()
@@ -153,12 +151,12 @@ func (cfg *config) openDB(dsn string) (*sql.DB, error) {
 
 	db.SetConnMaxIdleTime(maxIdleTime)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err = db.PingContext(ctx); err != nil {
 		return nil, err
 	}
 
-	return db, nil 
+	return db, nil
 }

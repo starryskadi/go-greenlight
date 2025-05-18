@@ -30,64 +30,62 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-} 
+}
 
 func (app *application) rateLimit(next http.Handler) http.Handler {
-		type client struct {
-			limiter 	*rate.Limiter
-			lastSeen 	time.Time
+	type client struct {
+		limiter  *rate.Limiter
+		lastSeen time.Time
+	}
+
+	var (
+		mu      sync.Mutex
+		clients = make(map[string]*client)
+	)
+
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+
+			mu.Lock()
+
+			for ip, client := range clients {
+				if time.Since(client.lastSeen) > 3*time.Minute {
+					delete(clients, ip)
+				}
+			}
+
+			mu.Unlock()
+		}
+	}()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !app.config.limiter.enabled {
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+
+			mu.Lock()
+
+			if _, found := clients[ip]; !found {
+				clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
+			}
+
+			clients[ip].lastSeen = time.Now()
+
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				app.rateLimitExceededResponse(w, r)
+				return
+			}
+
+			mu.Unlock()
 		}
 
-		var (
-			mu sync.Mutex
-			clients = make(map[string]*client)
-		)
-
-		go func() {
-			for {
-				time.Sleep(time.Minute)
-
-				mu.Lock()
-
-				for ip, client := range clients {
-					if time.Since(client.lastSeen) > 3*time.Minute {
-						delete(clients, ip)
-					}
-				}
-
-				mu.Unlock()
-			}
-		}()
-		
-	
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !app.config.limiter.enabled {
-				ip, _, err := net.SplitHostPort(r.RemoteAddr)
-				if err != nil {
-					app.serverErrorResponse(w, r, err)
-					return
-				}
-
-				mu.Lock()
-
-				if _, found := clients[ip]; !found {
-					clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
-				}
-
-				clients[ip].lastSeen = time.Now()
-
-				if !clients[ip].limiter.Allow() {
-					mu.Unlock()
-					app.rateLimitExceededResponse(w, r)
-					return
-				}
-
-				mu.Unlock()
-			}
-			
-
-			next.ServeHTTP(w, r)
-		})
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (app *application) authenticate(next http.Handler) http.Handler {
@@ -98,15 +96,15 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		if authroziationHeader == "" {
 			r = app.ContextSetUser(r, data.AnonymousUser)
-			next.ServeHTTP(w ,r)
-			return 
+			next.ServeHTTP(w, r)
+			return
 		}
 
 		headerParts := strings.Split(authroziationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
 			app.invalidAuthenticationTokenResponse(w, r)
 			return
-		} 
+		}
 
 		token := headerParts[1]
 
@@ -116,7 +114,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		if !v.Valid() {
 			app.invalidAuthenticationTokenResponse(w, r)
-			return 
+			return
 		}
 
 		user, err := app.models.Users.GetFromToken(data.ScopeAuthentication, token)
@@ -128,13 +126,13 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 			default:
 				app.serverErrorResponse(w, r, err)
 			}
-			return 
+			return
 		}
 
 		r = app.ContextSetUser(r, user)
 		next.ServeHTTP(w, r)
 	})
-} 
+}
 
 func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +151,7 @@ func (app *application) requireActivateUser(next http.Handler) http.Handler {
 
 		if user.IsAnonymous() {
 			app.authenticationRequiredResponse(w, r)
-			return 
+			return
 		}
 
 		if !user.Activated {
@@ -175,19 +173,19 @@ func (app *application) requirePermission(code string, next http.Handler) http.H
 
 		if err != nil {
 			app.serverErrorResponse(w, r, err)
-			return 
+			return
 		}
-		 
-	    if !permissions.Include(code) {
+
+		if !permissions.Include(code) {
 			app.notPermittedResponse(w, r)
-			return 
+			return
 		}
 
 		next.ServeHTTP(w, r)
 	})
 
 	return app.requireActivateUser(fn)
-} 
+}
 
 func (app *application) enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +207,7 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 					w.Header().Set("Access-Control-Max-Age", "60")
 
 					w.WriteHeader(http.StatusOK)
-					return 
+					return
 				}
 			}
 		}
@@ -242,7 +240,7 @@ func (app *application) metrics(next http.Handler) http.Handler {
 		// function to convert the status code (which is an integer) to a string.
 		totalResponsesSentByStatus.Add(strconv.Itoa(metrics.Code), 1)
 	})
-	}
+}
 
 func CreateMiddlewareStack(xs ...Middleware) Middleware {
 	return func(next http.Handler) http.Handler {

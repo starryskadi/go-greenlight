@@ -15,11 +15,11 @@ var templateFS embed.FS
 
 type Mailer struct {
 	dialer *mail.Dialer
-	sender string 
+	sender string
 }
 
 func New(host string, port int, username, password, sender string) Mailer {
-	dialer := mail.NewDialer(host, port, username, password) 
+	dialer := mail.NewDialer(host, port, username, password)
 	dialer.Timeout = 5 * time.Second
 
 	return Mailer{
@@ -29,12 +29,12 @@ func New(host string, port int, username, password, sender string) Mailer {
 }
 
 func (m Mailer) Send(recipient, templateFile string, data any) error {
-	tmpl, err := template.New("email").ParseFS(templateFS, "templates/" + templateFile)
-    if err != nil {
+	tmpl, err := template.New("email").ParseFS(templateFS, "templates/"+templateFile)
+	if err != nil {
 		return err
 	}
 
-	subject := new(bytes.Buffer) 
+	subject := new(bytes.Buffer)
 
 	err = tmpl.ExecuteTemplate(subject, "subject", data)
 
@@ -42,7 +42,7 @@ func (m Mailer) Send(recipient, templateFile string, data any) error {
 		return err
 	}
 
-	plainBody := new(bytes.Buffer) 
+	plainBody := new(bytes.Buffer)
 
 	err = tmpl.ExecuteTemplate(plainBody, "plainBody", data)
 
@@ -50,7 +50,7 @@ func (m Mailer) Send(recipient, templateFile string, data any) error {
 		return err
 	}
 
-	htmlBody := new(bytes.Buffer) 
+	htmlBody := new(bytes.Buffer)
 
 	err = tmpl.ExecuteTemplate(htmlBody, "plainBody", data)
 
@@ -65,13 +65,12 @@ func (m Mailer) Send(recipient, templateFile string, data any) error {
 	msg.SetBody("text/plain", plainBody.String())
 	msg.AddAlternative("text/html", htmlBody.String())
 
-
 	// Retry up to 3 times
 	for i := 1; i <= 3; i++ {
 		err := m.dialer.DialAndSend(msg)
 
 		if nil == err {
-			return nil 
+			return nil
 		}
 
 		time.Sleep(500 * time.Millisecond)

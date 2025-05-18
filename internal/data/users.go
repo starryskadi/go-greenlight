@@ -15,13 +15,13 @@ import (
 var AnonymousUser = &User{}
 
 type User struct {
-	ID			int64			`json:"id"`
-	CreatedAt	time.Time		`json:"created_at"`
-	Name 		string			`json:"name"`
-	Email		string 			`json:"email"`
-	Password	password		`json:"-"`
-	Activated	bool			`json:"activated"`
-	Version 	int				`json:"version"`
+	ID        int64     `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Password  password  `json:"-"`
+	Activated bool      `json:"activated"`
+	Version   int       `json:"version"`
 }
 
 func (u *User) IsAnonymous() bool {
@@ -30,30 +30,29 @@ func (u *User) IsAnonymous() bool {
 
 type password struct {
 	plaintext *string
-	hash []byte
+	hash      []byte
 }
-
 
 func (p *password) Set(plaintextPassword string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plaintextPassword), 12)
 
 	if err != nil {
-		return nil 
+		return nil
 	}
 
 	p.plaintext = &plaintextPassword
 	p.hash = hash
 
-	return nil 
+	return nil
 }
 
-func (p *password) Matches(plaintextPassword string) (bool, error)  {
+func (p *password) Matches(plaintextPassword string) (bool, error) {
 	err := bcrypt.CompareHashAndPassword(p.hash, []byte(plaintextPassword))
 	if err != nil {
 		switch {
-			case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
+		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
 			return false, nil
-			default:
+		default:
 			return false, err
 		}
 	}
@@ -84,7 +83,7 @@ func ValidateUser(v *validator.Validator, user *User) {
 	if user.Password.hash == nil {
 		panic("missing password hash for user")
 	}
-}  
+}
 
 type UserModel struct {
 	DB *sql.DB
@@ -98,8 +97,8 @@ func (u *UserModel) Insert(user *User) error {
 
 	args := []any{user.Name, user.Email, user.Password.hash, user.Activated}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
-	defer cancel() 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	row := u.DB.QueryRowContext(ctx, stmt, args...)
 
@@ -124,25 +123,25 @@ func (u *UserModel) GetByEmail(email string) (*User, error) {
 		WHERE email = $1
 	`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var user User 
+	var user User
 
-	row := u.DB.QueryRowContext(ctx, stmt,email)
+	row := u.DB.QueryRowContext(ctx, stmt, email)
 
-	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password.hash, &user.Activated, &user.Version) 
+	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.Password.hash, &user.Activated, &user.Version)
 
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return nil, err 
+			return nil, err
 		default:
-			return nil, err 
+			return nil, err
 		}
 	}
 
-	return &user, nil 
+	return &user, nil
 }
 
 func (u *UserModel) Update(user *User) error {
@@ -153,8 +152,8 @@ func (u *UserModel) Update(user *User) error {
 		RETURNING version
 	`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
-	defer cancel() 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	row := u.DB.QueryRowContext(ctx, stmt, user.Name, user.Email, user.Password.hash, user.Activated, user.ID, user.Version)
 
@@ -171,10 +170,10 @@ func (u *UserModel) Update(user *User) error {
 		}
 	}
 
-	return nil 
+	return nil
 }
 
-func (u *UserModel) GetFromToken(tokenScope string, tokenPlainText string)  (*User, error) {
+func (u *UserModel) GetFromToken(tokenScope string, tokenPlainText string) (*User, error) {
 	tokenHash := sha256.Sum256([]byte(tokenPlainText))
 
 	stmt := `SELECT users.id, users.created_at, users.name, users.email, users.password_hash, users.activated, users.version
@@ -198,7 +197,7 @@ func (u *UserModel) GetFromToken(tokenScope string, tokenPlainText string)  (*Us
 		&user.Name,
 		&user.Email,
 		&user.Password.hash,
-		&user.Activated, 
+		&user.Activated,
 		&user.Version,
 	)
 

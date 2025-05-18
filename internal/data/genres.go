@@ -5,14 +5,13 @@ import (
 )
 
 type Genre struct {
-	ID int 			`json:"-"`
-	Title string 	`json:"title"`
+	ID    int    `json:"-"`
+	Title string `json:"title"`
 }
 
 type GenreModel struct {
 	DB *sql.DB
 }
-
 
 func (g GenreModel) Insert(genre *Genre) error {
 	stmt := "INSERT INTO genres (title) VALUES ($1) ON CONFLICT (title) DO UPDATE SET title = EXCLUDED.title RETURNING id;"

@@ -11,8 +11,8 @@ import (
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
+		Name     string `json:"name"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
@@ -20,20 +20,20 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	if err != nil {
 		app.badRequestResponse(w, r, err)
-		return 
+		return
 	}
 
 	user := &data.User{
-		Name:		input.Name, 
-		Email: 		input.Email, 
-		Activated: 	false,
+		Name:      input.Name,
+		Email:     input.Email,
+		Activated: false,
 	}
 
 	err = user.Password.Set(input.Password)
 
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
-		return 
+		return
 	}
 
 	v := validator.New()
@@ -53,7 +53,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 			app.serverErrorResponse(w, r, err)
 		}
 
-		return 
+		return
 	}
 
 	err = app.models.Permissions.AddForUser(user.ID, "movies:read")
@@ -69,13 +69,10 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-
-
-
 	app.background(func() {
 		data := map[string]any{
 			"activationToken": token.Plaintext,
-			"userID": user.ID,
+			"userID":          user.ID,
 		}
 
 		err = app.mailer.Send(user.Email, "user_welcome.tmpl.html", data)
@@ -86,8 +83,8 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 	})
 
-	err = app.writeJSON(w, 200, envelope{ "users": user })
-	
+	err = app.writeJSON(w, 200, envelope{"users": user})
+
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -100,15 +97,15 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 
 	err := app.readJSON(w, r, &input)
 
-    if err != nil {
-		app.serverErrorResponse(w,r,err)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	v := validator.New()
 
 	if data.ValidateTokenPlaintext(v, input.TokenPlainText); !v.Valid() {
-		app.failedValidationResponse(w, r, v.Errors) 
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -116,15 +113,15 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			v.AddError("token", "invalid or expired activation token");
+			v.AddError("token", "invalid or expired activation token")
 			app.failedValidationResponse(w, r, v.Errors)
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
-		return 
+		return
 	}
 
-	user.Activated = true 
+	user.Activated = true
 
 	err = app.models.Users.Update(user)
 	if err != nil {
@@ -132,7 +129,7 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 		case errors.Is(err, data.ErrRecordNotFound):
 			app.editConflictResponse(w, r)
 		default:
-			app.serverErrorResponse(w,r,err)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -140,13 +137,13 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 	err = app.models.Tokens.DeleteAllForUser(data.ScopeActivation, user.ID)
 
 	if err != nil {
-		app.serverErrorResponse(w,r,err)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, 200, envelope{ "user": user })
+	err = app.writeJSON(w, 200, envelope{"user": user})
 
 	if err != nil {
-		app.serverErrorResponse(w,r,err)
+		app.serverErrorResponse(w, r, err)
 	}
 }

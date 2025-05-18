@@ -7,10 +7,9 @@ import (
 )
 
 type MoviesGenres struct {
-	MovieID int 
+	MovieID int
 	GenreID int
 }
-
 
 type MoviesGenresModel struct {
 	DB *sql.DB
@@ -25,8 +24,8 @@ func (mg MoviesGenresModel) AddMovieToGenre(moviesGenres MoviesGenres) error {
 		return err
 	}
 
-	return nil 
-}   
+	return nil
+}
 
 func (mg MoviesGenresModel) DeleteMovieFromGenre(moviesGenres MoviesGenres) error {
 	stmt := "DELETE FROM movies_genres WHERE movie_id = $1 AND genre_id = $2;"
@@ -37,10 +36,8 @@ func (mg MoviesGenresModel) DeleteMovieFromGenre(moviesGenres MoviesGenres) erro
 		return err
 	}
 
-	return nil 
-} 
-
-
+	return nil
+}
 
 func (mg MoviesGenresModel) BulkUpdateMoviesFromGenre(movieID int, moviesGenres []MoviesGenres) error {
 	if len(moviesGenres) < 1 {
@@ -48,12 +45,12 @@ func (mg MoviesGenresModel) BulkUpdateMoviesFromGenre(movieID int, moviesGenres 
 		_, err := mg.DB.Exec(stmt, movieID)
 
 		if err != nil {
-			return err 
+			return err
 		}
 
 		return nil
-	} 
-	
+	}
+
 	s := []string{}
 
 	for i := range moviesGenres {
@@ -86,6 +83,6 @@ func (mg MoviesGenresModel) BulkUpdateMoviesFromGenre(movieID int, moviesGenres 
 	if err != nil {
 		return err
 	}
-	
-	return nil 
+
+	return nil
 }

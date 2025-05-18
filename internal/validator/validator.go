@@ -7,7 +7,7 @@ var (
 )
 
 type Validator struct {
-	Errors map[string]string 
+	Errors map[string]string
 }
 
 func New() *Validator {
@@ -47,7 +47,7 @@ func Matches(value string, rx *regexp.Regexp) bool {
 }
 
 func Unique(values []string) bool {
-	uniqueValues := make(map[string]bool) 
+	uniqueValues := make(map[string]bool)
 
 	for _, value := range values {
 		uniqueValues[value] = true

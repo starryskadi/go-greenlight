@@ -29,7 +29,7 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 	w.WriteHeader(status)
 	w.Write(js)
 
-	return nil 
+	return nil
 }
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
@@ -110,7 +110,6 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 		return defaultValue
 	}
 
-	
 	return i
 }
 
@@ -132,7 +131,7 @@ func (app *application) background(fn func()) {
 		// Recover any panic.
 		defer func() {
 			if err := recover(); err != nil {
-			app.logger.PrintError(fmt.Errorf("%s", err), nil)
+				app.logger.PrintError(fmt.Errorf("%s", err), nil)
 			}
 		}()
 		// Execute the arbitrary function that we passed as the parameter.

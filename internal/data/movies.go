@@ -12,13 +12,13 @@ import (
 )
 
 type Movie struct {
-	ID int				`json:"id"`
-	CreatedAt time.Time	`json:"-"`
-	Title string 		`json:"title"`
-	Year int32			`json:"year"`
-	Runtime Runtime 	`json:"runtime"`
-	Genres []string 	`json:"genres"`
-	Version int32		`json:"version"`
+	ID        int       `json:"id"`
+	CreatedAt time.Time `json:"-"`
+	Title     string    `json:"title"`
+	Year      int32     `json:"year"`
+	Runtime   Runtime   `json:"runtime"`
+	Genres    []string  `json:"genres"`
+	Version   int32     `json:"version"`
 	// the visibility of individual struct fields in the JSON by using the omitempty and - struct tag directives.
 }
 
@@ -44,15 +44,15 @@ type MovieModel struct {
 type MovieInterface interface {
 	Insert(movie *Movie) error
 	Get(id int) (*Movie, error)
-	Update(movie *Movie) error 
+	Update(movie *Movie) error
 	Delete(id int) error
-	GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) 
+	GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error)
 }
 
 func (m MovieModel) Insert(movie *Movie) error {
 	stmt := `INSERT INTO movies (title, year, runtime) VALUES($1, $2, $3) RETURNING id, created_at, version;`
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
 	return m.DB.QueryRowContext(ctx, stmt, movie.Title, movie.Year, movie.Runtime).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
@@ -69,10 +69,10 @@ func (m MovieModel) Get(id int) (*Movie, error) {
 		WHERE m.id = $1
 		GROUP BY m.id,  m.title, m.year, m.runtime, m.version;`
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	row := m.DB.QueryRowContext(ctx, stmt, id)  
+	row := m.DB.QueryRowContext(ctx, stmt, id)
 
 	movie := &Movie{}
 
@@ -99,12 +99,12 @@ func (m MovieModel) Get(id int) (*Movie, error) {
 }
 
 func (m MovieModel) Update(movie *Movie) error {
-	stmt := "UPDATE movies SET title = $2, year = $3, runtime = $4, version = version + 1 WHERE id = $1 AND version = $5 RETURNING version";
+	stmt := "UPDATE movies SET title = $2, year = $3, runtime = $4, version = version + 1 WHERE id = $1 AND version = $5 RETURNING version"
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	row := m.DB.QueryRowContext(ctx, stmt, movie.ID, movie.Title, movie.Year, movie.Runtime, movie.Version);
+	row := m.DB.QueryRowContext(ctx, stmt, movie.ID, movie.Title, movie.Year, movie.Runtime, movie.Version)
 
 	err := row.Scan(&movie.Version)
 
@@ -121,13 +121,13 @@ func (m MovieModel) Update(movie *Movie) error {
 }
 
 func (m MovieModel) Delete(id int) error {
-	stmt := "DELETE FROM movies WHERE id = $1;";
+	stmt := "DELETE FROM movies WHERE id = $1;"
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
 	result, err := m.DB.ExecContext(ctx, stmt, id)
-	
+
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (m MovieModel) Delete(id int) error {
 		return ErrRecordNotFound
 	}
 
-	return nil 
+	return nil
 }
 
 func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
@@ -156,12 +156,12 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 		LIMIT $3
 		OFFSET $4;`, filters.sortColumn(), filters.sortDirection())
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
 	args := []any{title, pq.Array(genres), filters.limit(), filters.offset()}
 
-	row, err := m.DB.QueryContext(ctx, stmt,args...)  
+	row, err := m.DB.QueryContext(ctx, stmt, args...)
 
 	if err != nil {
 		return nil, Metadata{}, err
@@ -193,20 +193,20 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 		movies = append(movies, &movie)
 	}
 
-	metadata := calculateMetadata(totalRecords,filters.Page, filters.PageSize)
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
 
 	if err = row.Err(); err != nil {
 		return nil, Metadata{}, err
 	}
 
-	return movies, metadata, nil 
+	return movies, metadata, nil
 }
 
 type MockMovieModel struct{}
 
 func (m MockMovieModel) Insert(movie *Movie) error {
 	// Mock the action...
-	return nil 
+	return nil
 }
 func (m MockMovieModel) Get(id int) (*Movie, error) {
 	return nil, nil
@@ -216,7 +216,7 @@ func (m MockMovieModel) Update(movie *Movie) error {
 }
 
 func (m MockMovieModel) Delete(id int) error {
-	return nil 
+	return nil
 }
 
 func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {

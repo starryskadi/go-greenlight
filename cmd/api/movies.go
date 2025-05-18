@@ -12,10 +12,10 @@ import (
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Title string 		`json:"title"`
-		Year int32			`json:"year"`
-		Runtime data.Runtime`json:"runtime"`
-		Genres []string 	`json:"genres"`
+		Title   string       `json:"title"`
+		Year    int32        `json:"year"`
+		Runtime data.Runtime `json:"runtime"`
+		Genres  []string     `json:"genres"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -27,10 +27,10 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	v := validator.New()
 
 	movie := &data.Movie{
-		Title: input.Title,
-		Year: input.Year,
+		Title:   input.Title,
+		Year:    input.Year,
 		Runtime: input.Runtime,
-		Genres: input.Genres,
+		Genres:  input.Genres,
 	}
 
 	if data.ValidateMovie(v, movie); !v.Valid() {
@@ -53,7 +53,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 		if err != nil {
 			app.errorResponse(w, r, http.StatusInternalServerError, err.Error())
-			return 
+			return
 		}
 
 		movieGenres := data.MoviesGenres{
@@ -74,14 +74,14 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Title string 
-		Genres []string 
+		Title  string
+		Genres []string
 		data.Filters
 	}
-	
+
 	qs := r.URL.Query()
 
-	v := validator.New();
+	v := validator.New()
 
 	input.Title = app.readString(qs, "title", "")
 	input.Genres = app.readCSV(qs, "genres", []string{})
@@ -93,8 +93,8 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	data.ValidateFilter(v, input.Filters)
 
 	if !v.Valid() {
-		app.failedValidationResponse(w,r,  v.Errors)
-		return 
+		app.failedValidationResponse(w, r, v.Errors)
+		return
 	}
 
 	fmt.Printf("%+v\n", input)
@@ -102,11 +102,11 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	movies, metadata, err := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
 
 	if err != nil {
-		app.serverErrorResponse(w,r,  err)
+		app.serverErrorResponse(w, r, err)
 	}
 
 	app.writeJSON(w, http.StatusOK, envelope{
-		"movies": movies,
+		"movies":   movies,
 		"metadata": metadata,
 	})
 }
@@ -120,23 +120,23 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 		app.notFoundResponse(w, r)
 		return
 	}
-	 
+
 	movie, err := app.models.Movies.Get(id)
 
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w,r)
+			app.notFoundResponse(w, r)
 		default:
-			app.serverErrorResponse(w,r, err)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{ "movies": movie })
+	err = app.writeJSON(w, http.StatusOK, envelope{"movies": movie})
 
 	if err != nil {
-		app.serverErrorResponse(w,r, err)
+		app.serverErrorResponse(w, r, err)
 	}
 }
 
@@ -146,33 +146,32 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	id, err := strconv.Atoi(idString)
 
 	if err != nil || id < 1 {
-		app.notFoundResponse(w,r)
-		return 
+		app.notFoundResponse(w, r)
+		return
 	}
 
 	movie, err := app.models.Movies.Get(id)
 	if err != nil {
 		switch {
-			case errors.Is(err, data.ErrRecordNotFound):
-				app.notFoundResponse(w,r)
-			default:
-				app.serverErrorResponse(w, r, err)
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
 		}
-		return 
+		return
 	}
-	
 
 	var input struct {
-		Title *string `json:"title"`
-		Year *int32 `json:"year"`
+		Title   *string       `json:"title"`
+		Year    *int32        `json:"year"`
 		Runtime *data.Runtime `json:"runtime"`
-		Genres []string `json:"genres"`
-	} 
+		Genres  []string      `json:"genres"`
+	}
 
 	err = app.readJSON(w, r, &input)
 
 	if err != nil {
-		app.badRequestResponse(w,r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -181,21 +180,21 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	if input.Year != nil {
-		movie.Year= *input.Year
+		movie.Year = *input.Year
 	}
 
 	if input.Runtime != nil {
-		movie.Runtime= *input.Runtime
+		movie.Runtime = *input.Runtime
 	}
 
 	if input.Genres != nil {
-		movie.Genres= input.Genres
+		movie.Genres = input.Genres
 	}
 
 	v := validator.New()
 
-	if data.ValidateMovie(v, movie);  !v.Valid() {
-		app.failedValidationResponse(w,r, v.Errors)
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -204,27 +203,27 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			app.editConflictResponse(w,r)
+			app.editConflictResponse(w, r)
 		default:
-			app.serverErrorResponse(w,r, err) 
+			app.serverErrorResponse(w, r, err)
 		}
-		
-		return 
+
+		return
 	}
 
 	moviesGenres := []data.MoviesGenres{}
 
 	for _, v := range movie.Genres {
-		genre := &data.Genre{ Title: v }
-		
+		genre := &data.Genre{Title: v}
+
 		err := app.models.Genres.Insert(genre)
 
 		if err != nil {
-			app.serverErrorResponse(w, r,err) 
+			app.serverErrorResponse(w, r, err)
 			return
 		}
 
-		moviesGenres = append(moviesGenres, 
+		moviesGenres = append(moviesGenres,
 			data.MoviesGenres{
 				MovieID: movie.ID,
 				GenreID: genre.ID,
@@ -232,18 +231,18 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		)
 	}
 
-	err  = app.models.MoviesGenres.BulkUpdateMoviesFromGenre(movie.ID, moviesGenres)
+	err = app.models.MoviesGenres.BulkUpdateMoviesFromGenre(movie.ID, moviesGenres)
 
 	if err != nil {
-		app.serverErrorResponse(w, r, err) 
-		return 
+		app.serverErrorResponse(w, r, err)
+		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{ "movies": movie })
+	err = app.writeJSON(w, http.StatusOK, envelope{"movies": movie})
 
 	if err != nil {
-		app.serverErrorResponse(w, r, err) 
-		return 
+		app.serverErrorResponse(w, r, err)
+		return
 	}
 }
 
@@ -254,7 +253,7 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 
 	if err != nil || id < 1 {
 		app.notFoundResponse(w, r)
-		return 
+		return
 	}
 
 	err = app.models.Movies.Delete(id)
@@ -264,15 +263,15 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, data.ErrRecordNotFound):
 			app.notFoundResponse(w, r)
 		default:
-			app.serverErrorResponse(w, r, err) 
+			app.serverErrorResponse(w, r, err)
 		}
-		return 
+		return
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"message": "movie successfully deleted"})
 
 	if err != nil {
-		app.serverErrorResponse(w,r, err) 
-		return 
+		app.serverErrorResponse(w, r, err)
+		return
 	}
 }

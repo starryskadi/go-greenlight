@@ -7,10 +7,10 @@ import (
 
 	"github.com/lib/pq"
 )
- 
+
 const (
-	PermissionMovieRead = "movies:read"
-	PermissionMovieWrite =  "movies:write"
+	PermissionMovieRead  = "movies:read"
+	PermissionMovieWrite = "movies:write"
 )
 
 type Permissions []string
@@ -45,14 +45,14 @@ func (pm PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
 	permissions := Permissions{}
 
 	for rows.Next() {
-		var permission string 
-		 err := rows.Scan(&permission) 
+		var permission string
+		err := rows.Scan(&permission)
 
-		 if err != nil {
+		if err != nil {
 			return nil, err
-		 }
+		}
 
-		 permissions = append(permissions, permission)
+		permissions = append(permissions, permission)
 	}
 
 	if rows.Err(); err != nil {
@@ -62,7 +62,7 @@ func (pm PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
 	return permissions, nil
 }
 
-func (pm PermissionModel) AddForUser(userID int64, codes... string) error {
+func (pm PermissionModel) AddForUser(userID int64, codes ...string) error {
 	stmt := `INSERT INTO users_permissions SELECT $1, permissions.id FROM permissions WHERE permissions.code = ANY($2)`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
