@@ -21,7 +21,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	err := app.readJSON(w, r, &input)
 
 	if err != nil {
-		app.errorResponse(w, http.StatusInternalServerError, err.Error())
+		app.errorResponse(w, r, http.StatusInternalServerError, err.Error())
 	}
 
 	v := validator.New()
@@ -34,14 +34,14 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	if data.ValidateMovie(v, movie); !v.Valid() {
-		app.failedValidationResponse(w, v.Errors)
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
 	err = app.models.Movies.Insert(movie)
 
 	if err != nil {
-		app.errorResponse(w,  http.StatusInternalServerError, err.Error())
+		app.errorResponse(w, r, http.StatusInternalServerError, err.Error())
 	}
 
 	for _, v := range movie.Genres {
@@ -52,7 +52,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		err = app.models.Genres.Insert(&genre)
 
 		if err != nil {
-			app.errorResponse(w,  http.StatusInternalServerError, err.Error())
+			app.errorResponse(w, r, http.StatusInternalServerError, err.Error())
 			return 
 		}
 
@@ -64,7 +64,7 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 		err = app.models.MoviesGenres.AddMovieToGenre(movieGenres)
 
 		if err != nil {
-			app.errorResponse(w,  http.StatusInternalServerError, err.Error())
+			app.errorResponse(w, r, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
@@ -93,22 +93,22 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	data.ValidateFilter(v, input.Filters)
 
 	if !v.Valid() {
-		app.failedValidationResponse(w, v.Errors)
+		app.failedValidationResponse(w,r,  v.Errors)
 		return 
 	}
 
 	fmt.Printf("%+v\n", input)
 
-	movies, err := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
+	movies, metadata, err := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
 
 	if err != nil {
-		app.serverErrorResponse(w, err)
+		app.serverErrorResponse(w,r,  err)
 	}
 
 	app.writeJSON(w, http.StatusOK, envelope{
 		"movies": movies,
+		"metadata": metadata,
 	})
-
 }
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +117,7 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 	id, err := strconv.Atoi(idString)
 
 	if err != nil || id < 1 {
-		app.notFoundResponse(w)
+		app.notFoundResponse(w, r)
 		return
 	}
 	 
@@ -126,9 +126,9 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w)
+			app.notFoundResponse(w,r)
 		default:
-			app.serverErrorResponse(w, err)
+			app.serverErrorResponse(w,r, err)
 		}
 		return
 	}
@@ -136,7 +136,7 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 	err = app.writeJSON(w, http.StatusOK, envelope{ "movies": movie })
 
 	if err != nil {
-		app.serverErrorResponse(w, err)
+		app.serverErrorResponse(w,r, err)
 	}
 }
 
@@ -146,7 +146,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	id, err := strconv.Atoi(idString)
 
 	if err != nil || id < 1 {
-		app.notFoundResponse(w)
+		app.notFoundResponse(w,r)
 		return 
 	}
 
@@ -154,9 +154,9 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		switch {
 			case errors.Is(err, data.ErrRecordNotFound):
-				app.notFoundResponse(w)
+				app.notFoundResponse(w,r)
 			default:
-				app.serverErrorResponse(w, err)
+				app.serverErrorResponse(w, r, err)
 		}
 		return 
 	}
@@ -172,7 +172,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	err = app.readJSON(w, r, &input)
 
 	if err != nil {
-		app.badRequestResponse(w, err)
+		app.badRequestResponse(w,r, err)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	v := validator.New()
 
 	if data.ValidateMovie(v, movie);  !v.Valid() {
-		app.failedValidationResponse(w, v.Errors)
+		app.failedValidationResponse(w,r, v.Errors)
 		return
 	}
 
@@ -204,9 +204,9 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			app.editConflictResponse(w)
+			app.editConflictResponse(w,r)
 		default:
-			app.serverErrorResponse(w, err) 
+			app.serverErrorResponse(w,r, err) 
 		}
 		
 		return 
@@ -220,7 +220,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		err := app.models.Genres.Insert(genre)
 
 		if err != nil {
-			app.serverErrorResponse(w, err) 
+			app.serverErrorResponse(w, r,err) 
 			return
 		}
 
@@ -235,14 +235,14 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	err  = app.models.MoviesGenres.BulkUpdateMoviesFromGenre(movie.ID, moviesGenres)
 
 	if err != nil {
-		app.serverErrorResponse(w, err) 
+		app.serverErrorResponse(w, r, err) 
 		return 
 	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{ "movies": movie })
 
 	if err != nil {
-		app.serverErrorResponse(w, err) 
+		app.serverErrorResponse(w, r, err) 
 		return 
 	}
 }
@@ -253,7 +253,7 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 	id, err := strconv.Atoi(idString)
 
 	if err != nil || id < 1 {
-		app.notFoundResponse(w)
+		app.notFoundResponse(w, r)
 		return 
 	}
 
@@ -262,9 +262,9 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w)
+			app.notFoundResponse(w, r)
 		default:
-			app.serverErrorResponse(w, err) 
+			app.serverErrorResponse(w, r, err) 
 		}
 		return 
 	}
@@ -272,7 +272,7 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 	err = app.writeJSON(w, http.StatusOK, envelope{"message": "movie successfully deleted"})
 
 	if err != nil {
-		app.serverErrorResponse(w, err) 
+		app.serverErrorResponse(w,r, err) 
 		return 
 	}
 }

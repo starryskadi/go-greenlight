@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -45,7 +46,7 @@ type MovieInterface interface {
 	Get(id int) (*Movie, error)
 	Update(movie *Movie) error 
 	Delete(id int) error
-	GetAll(title string, genres []string, filters Filters) ([]*Movie, error) 
+	GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) 
 }
 
 func (m MovieModel) Insert(movie *Movie) error {
@@ -144,35 +145,37 @@ func (m MovieModel) Delete(id int) error {
 	return nil 
 }
 
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
-	stmt := `SELECT m.id, m.title, m.year, m.runtime, m.version, ARRAY_AGG(g.title) as "genre_title" FROM public."movies" as m
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	stmt := fmt.Sprintf(`SELECT count(*) OVER(), m.id, m.title, m.year, m.runtime, m.version, ARRAY_AGG(g.title) as "genre_title" FROM public."movies" as m
 		LEFT JOIN movies_genres as mg ON m.id = mg.movie_id
 		LEFT JOIN genres as g ON mg.genre_id = g.id
 		WHERE (to_tsvector('simple', m.title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
 		GROUP BY m.id,  m.title, m.year, m.runtime, m.version
 		HAVING ($2 <@ ARRAY_AGG(g.title) OR $2= '{}')
-		ORDER BY $5
+		ORDER BY m.%s %s
 		LIMIT $3
-		OFFSET $4;`
+		OFFSET $4;`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 3)
 	defer cancel()
 
-	sortBy := "m.id ASC"
+	args := []any{title, pq.Array(genres), filters.limit(), filters.offset()}
 
-	row, err := m.DB.QueryContext(ctx, stmt, title, pq.Array(genres), filters.PageSize, (filters.Page - 1) * filters.PageSize, sortBy)  
+	row, err := m.DB.QueryContext(ctx, stmt,args...)  
 
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
 	movies := []*Movie{}
+	var totalRecords int
 
 	for row.Next() {
 		var movie Movie
 
 		var genreTitles []sql.NullString
-		err := row.Scan(&movie.ID, &movie.Title, &movie.Year, &movie.Runtime, &movie.Version, pq.Array(&genreTitles))
+
+		err := row.Scan(&totalRecords, &movie.ID, &movie.Title, &movie.Year, &movie.Runtime, &movie.Version, pq.Array(&genreTitles))
 
 		genres := []string{}
 		for _, g := range genreTitles {
@@ -184,17 +187,19 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 		movie.Genres = genres
 
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 
 		movies = append(movies, &movie)
 	}
 
+	metadata := calculateMetadata(totalRecords,filters.Page, filters.PageSize)
+
 	if err = row.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
-	return movies, nil 
+	return movies, metadata, nil 
 }
 
 type MockMovieModel struct{}
@@ -214,6 +219,6 @@ func (m MockMovieModel) Delete(id int) error {
 	return nil 
 }
 
-func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
-	return nil, nil
+func (m MockMovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	return nil, Metadata{}, nil
 }
