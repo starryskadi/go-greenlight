@@ -18,11 +18,6 @@ confirm:
 run/api:
 	@go run ./cmd/api -db-dsn=${GREENLIGHT_DB_DSN}
 
-## build/api: build the cmd/api application
-.PHONY: build/api
-build/api:
-	@echo 'Building cmd/api...'
-	go build -ldflags='-s' -o=./bin/api ./cmd/api
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
@@ -71,4 +66,16 @@ vendor:
 	@echo 'Vendoring dependencies...'
 	go mod vendor
 
+# ==================================================================================== #
+# Build
+# ==================================================================================== #
 
+current_time = $(shell date --iso-8601=seconds)
+git_description = $(shell git describe --always --dirty)
+linker_flags = '-s -X main.buildTime=${current_time} -X main.version=${git_description}'
+
+## build/api: build the cmd/api application
+.PHONY: build/api
+build/api:
+	@echo 'Building cmd/api...'
+	go build -ldflags=${linker_flags} -o=./bin/api ./cmd/api
