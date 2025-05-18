@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
-	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -77,19 +76,19 @@ func main() {
 		return nil
 	})
 
-	envSmtpPort, err := strconv.Atoi(os.Getenv("SMTP_PORT"))
+	var smtpPort int 
 
-	if err != nil {
-		logger.PrintFatal(err, nil)
+	if envSmtpPort := os.Getenv("SMTP_PORT"); envSmtpPort != "" {
+		if tempSmtpPort, err := strconv.Atoi(envSmtpPort); err == nil {
+			smtpPort = tempSmtpPort
+		}
 	}
 
 	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("SMTP_HOST"), "SMTP host")
-	flag.IntVar(&cfg.smtp.port, "smtp-port", envSmtpPort, "SMTP Port")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", smtpPort, "SMTP Port")
 	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("SMTP_USER"), "SMTP Username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTP_PASS"), "SMTP Password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTP_SENDER"), "SMTP SENDER")
-
-	fmt.Println(&cfg.smtp)
 
 	flag.Parse()
 
