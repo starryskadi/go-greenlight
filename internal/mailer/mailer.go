@@ -59,6 +59,7 @@ func (m Mailer) Send(recipient, templateFile string, data any) error {
 	}
 
 	msg := mail.NewMessage()
+	msg.SetHeader("X-Tags", "Greenlight")
 	msg.SetHeader("To", "test1241251154@kyawzayarwin.com")
 	msg.SetHeader("From", m.sender)
 	msg.SetHeader("Subject", subject.String())
