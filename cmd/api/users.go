@@ -148,3 +148,109 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) createPasswordResetTokenHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email string 	`json:"email"`
+	}  
+
+	err := app.readJSON(w, r, &input)
+
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return 
+	}
+
+	v := validator.New() 
+
+	data.ValidateEmail(v, input.Email)
+
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return 
+	}
+
+	user, err := app.models.Users.GetByEmail(input.Email)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.badRequestResponse(w, r, err)
+			return 
+		default: 
+			app.serverErrorResponse(w, r, err)
+		}
+		return 
+	}
+
+	token, err := app.models.Tokens.New(user.ID, 15 * time.Minute, data.ScopePasswordReset)
+
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, 200, envelope{ "users": token })
+
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) updateUserPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Token string 	`json:"token"`
+		Password string	`json:"password"`
+	}
+
+	err := app.readJSON(w, r, &input)
+
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return 
+	}
+
+	v := validator.New()
+
+	data.ValidateTokenPlaintext(v, input.Token)
+
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return 
+	}
+
+	user, err := app.models.Users.GetFromToken(data.ScopePasswordReset, input.Token);
+
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.invalidAuthenticationTokenResponse(w, r)
+		default: 
+			app.serverErrorResponse(w, r, err)
+		}
+		return 
+	}
+
+	err = user.Password.Set(input.Password)
+ 
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return 
+	}
+
+	err = app.models.Users.Update(user)
+
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return 
+	}
+
+	err = app.writeJSON(w, 200, envelope{
+		"users": "password updated",
+	})
+
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return 
+	}
+}
