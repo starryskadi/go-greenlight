@@ -40,6 +40,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	if data.ValidateUser(v, user); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
+		return
 	}
 
 	err = app.models.Users.Insert(user)
