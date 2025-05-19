@@ -245,6 +245,13 @@ func (app *application) updateUserPasswordHandler(w http.ResponseWriter, r *http
 		return 
 	}
 
+	err = app.models.Tokens.DeleteAllForUser(data.ScopePasswordReset, user.ID)
+
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return 
+	}
+
 	err = app.writeJSON(w, 200, envelope{
 		"users": "password updated",
 	})

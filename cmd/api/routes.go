@@ -16,6 +16,7 @@ func (app *application) routes() http.Handler {
 		app.requireActivateUser,
 	)
 
+	// movies handler
 	mux.Handle("GET /v1/movies", protectedRoutes(app.requirePermission(data.PermissionMovieRead, http.HandlerFunc(app.listMoviesHandler))))
 	mux.Handle("POST /v1/movies", protectedRoutes(app.requirePermission(data.PermissionMovieWrite, http.HandlerFunc(app.createMovieHandler))))
 	mux.Handle("GET /v1/movies/{id}", protectedRoutes(app.requirePermission(data.PermissionMovieRead, http.HandlerFunc(app.showMovieHandler))))
@@ -26,6 +27,8 @@ func (app *application) routes() http.Handler {
 	mux.HandleFunc("POST /v1/users", app.registerUserHandler)
 	mux.HandleFunc("PUT /v1/users/activated", app.activateUserHandler)
 	mux.HandleFunc("POST /v1/tokens/authentication", app.createAuthenticationTokenHandler)
+	mux.HandleFunc("POST /v1/tokens/password-reset", app.createPasswordResetTokenHandler)
+	mux.HandleFunc("PUT /v1/users/password", app.updateUserPasswordHandler)
 
 	// Debug Handlers
 	mux.Handle("GET /debug/vars", expvar.Handler())
