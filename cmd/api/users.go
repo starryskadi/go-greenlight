@@ -183,14 +183,32 @@ func (app *application) createPasswordResetTokenHandler(w http.ResponseWriter, r
 		return 
 	}
 
+	if !user.Activated {
+		v.AddError("email", "user account must be activated")
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
 	token, err := app.models.Tokens.New(user.ID, 15 * time.Minute, data.ScopePasswordReset)
+
+	app.background(func() {
+		data := map[string]interface{}{
+			"passwordResetToken": token.Plaintext,
+		}
+
+		err := app.mailer.Send(user.Email, "password_rest.tmpl.html", data) 
+
+		if err != nil {
+			app.logger.PrintError(err, nil)
+		}
+	})
 
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, 200, envelope{ "users": token })
+	err = app.writeJSON(w, 200, envelope{ "message": "an email will be sent to you containing password reset instructions" })
 
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
@@ -224,7 +242,8 @@ func (app *application) updateUserPasswordHandler(w http.ResponseWriter, r *http
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.invalidAuthenticationTokenResponse(w, r)
+			v.AddError("token", "invalid or expired password reset token")
+			app.failedValidationResponse(w, r, v.Errors)
 		default: 
 			app.serverErrorResponse(w, r, err)
 		}
@@ -241,7 +260,12 @@ func (app *application) updateUserPasswordHandler(w http.ResponseWriter, r *http
 	err = app.models.Users.Update(user)
 
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return 
 	}
 
@@ -252,12 +276,11 @@ func (app *application) updateUserPasswordHandler(w http.ResponseWriter, r *http
 		return 
 	}
 
-	err = app.writeJSON(w, 200, envelope{
-		"users": "password updated",
+	err = app.writeJSON(w, http.StatusOK, envelope{
+		"message": "your password was successfully reset",
 	})
 
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
-		return 
 	}
 }
